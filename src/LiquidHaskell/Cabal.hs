@@ -143,7 +143,9 @@ sanitizeGhcOptions opts = GhcOptions
   , ghcOptOutputDynFile      = ghcOptOutputDynFile      opts
   , ghcOptSourcePathClear    = ghcOptSourcePathClear    opts
   , ghcOptSourcePath         = ghcOptSourcePath         opts
-#if MIN_VERSION_Cabal(1,22,0)
+#if MIN_VERSION_Cabal(1,24,0)
+  , ghcOptThisUnitId         = ghcOptThisUnitId         opts
+#elif MIN_VERSION_Cabal(1,22,0)
   , ghcOptPackageKey         = ghcOptPackageKey         opts
 #else
   , ghcOptPackageName        = ghcOptPackageName        opts
@@ -152,7 +154,7 @@ sanitizeGhcOptions opts = GhcOptions
   , ghcOptPackages           = ghcOptPackages           opts
   , ghcOptHideAllPackages    = ghcOptHideAllPackages    opts
   , ghcOptNoAutoLinkPackages = ghcOptNoAutoLinkPackages opts
-#if MIN_VERSION_Cabal(1,22,0)
+#if MIN_VERSION_Cabal(1,22,0) && !MIN_VERSION_Cabal(1,24,0)
   , ghcOptSigOf              = ghcOptSigOf              opts
 #endif
   , ghcOptLinkLibs           = ghcOptLinkLibs           opts
@@ -271,4 +273,3 @@ parseCommandArgs cmd =
     field = optsField "x-liquidhaskell-options"
                       (OtherCompiler "LiquidHaskell")
                       id (++)
-
