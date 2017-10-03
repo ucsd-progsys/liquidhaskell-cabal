@@ -133,7 +133,7 @@ makeGhcFlags
   -> [String]
 #if MIN_VERSION_Cabal(1,24,0)
 makeGhcFlags verbosity lbi clbi bi
-  = renderGhcOptions (compilerVersion (compiler lbi))
+  = renderGhcOptions (compiler lbi) (hostPlatform lbi)
   $ sanitizeGhcOptions
   $ componentGhcOptions verbosity lbi bi clbi (buildDir lbi)
 #else
