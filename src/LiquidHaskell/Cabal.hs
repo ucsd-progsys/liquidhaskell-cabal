@@ -104,7 +104,7 @@ verifyComponent verbosity lbi clbi bi desc sources = do
   let ghcFlags = makeGhcFlags verbosity lbi clbi bi
   let args = concat
         [ ("--ghc-option=" ++) <$> ghcFlags
-        , ("--c-files=" ++) <$> (cSources bi)
+        , ("--c-files="    ++) <$> (cSources bi)
         , userArgs
         , sources
         ]
@@ -114,11 +114,11 @@ verifyComponent verbosity lbi clbi bi desc sources = do
 getUserArgs :: String -> BuildInfo -> IO [ProgArg]
 getUserArgs desc bi =
   case lookup "x-liquidhaskell-options" (customFieldsBI bi) of
-    Nothing -> return []
+    Nothing  -> return []
     Just cmd ->
       case parseCommandArgs cmd of
         Right args -> return args
-        Left err -> die $
+        Left err   -> die $
           "failed to parse LiquidHaskell options for " ++ desc ++ ": " ++ err
 
 --------------------------------------------------------------------------------
@@ -142,21 +142,21 @@ makeGhcFlags verbosity lbi clbi bi
   $ sanitizeGhcOptions
   $ componentGhcOptions verbosity lbi bi clbi (buildDir lbi)
 #endif
--- Whitelist which GHC options get passed along to LiquidHaskell.
--- (see issue #2)
+
+-- Mute options that interfere with Liquid Haskell
 sanitizeGhcOptions :: GhcOptions -> GhcOptions
-sanitizeGhcOptions opts = opts
-  { ghcOptNoLink             = NoFlag -- LH uses LinkInMemory
-  , ghcOptOptimisation       = NoFlag -- conflicts with interactive mode GHC
-  , ghcOptProfilingMode      = NoFlag -- LH sets its own profiling mode
+sanitizeGhcOptions opts =
+  opts { ghcOptNoLink             = NoFlag -- LH uses LinkInMemory
+       , ghcOptOptimisation       = NoFlag -- conflicts with interactive mode GHC
+       , ghcOptProfilingMode      = NoFlag -- LH sets its own profiling mode
 #if MIN_VERSION_Cabal(1,20,0)
-  , ghcOptNumJobs            = NoFlag -- not relevant for LH
+       , ghcOptNumJobs            = NoFlag -- not relevant for LH
 #endif
 #if MIN_VERSION_Cabal(1,22,0)
-  , ghcOptHPCDir             = NoFlag -- not relevant for LH
+       , ghcOptHPCDir             = NoFlag -- not relevant for LH
 #endif
-  , ghcOptGHCiScripts        = mempty -- may interfere with interactive mode?
-  }
+       , ghcOptGHCiScripts        = mempty -- may interfere with interactive mode?
+       }
 
 --------------------------------------------------------------------------------
 -- Find Component Haskell Sources ----------------------------------------------
@@ -168,13 +168,13 @@ findLibSources lib = findModuleSources (libBuildInfo lib) (exposedModules lib)
 findExeSources :: Executable -> IO [FilePath]
 findExeSources exe = do
   moduleSrcs <- findModuleSources (buildInfo exe) []
-  mainSrc <- findFile (hsSourceDirs $ buildInfo exe) (modulePath exe)
+  mainSrc    <- findFile (hsSourceDirs (buildInfo exe)) (modulePath exe)
   return (mainSrc : moduleSrcs)
 
 findModuleSources :: BuildInfo -> [ModuleName] -> IO [FilePath]
 findModuleSources bi exposed = do
   let modules = exposed ++ otherModules bi
-  hsSources <- mapM (findModuleSource ["hs", "lhs"] bi) modules
+  hsSources     <- mapM (findModuleSource ["hs", "lhs"] bi)           modules
   hsBootSources <- mapM (findModuleSource ["hs-boot", "lhs-boot"] bi) modules
   return $ catMaybes (hsSources ++ hsBootSources)
 
@@ -200,7 +200,7 @@ liquidProgram = simpleProgram "liquid"
 isFlagEnabled :: String -> LocalBuildInfo -> IO Bool
 isFlagEnabled name lbi = case getOverriddenFlagValue name lbi of
   Just enabled -> return enabled
-  Nothing -> getDefaultFlagValue name lbi False
+  Nothing      -> getDefaultFlagValue name lbi False
 
 getOverriddenFlagValue :: String -> LocalBuildInfo -> Maybe Bool
 getOverriddenFlagValue name lbi = lookup (FlagName name) overriddenFlags
