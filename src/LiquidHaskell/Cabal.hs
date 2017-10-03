@@ -145,7 +145,7 @@ makeGhcFlags verbosity lbi clbi bi
 -- Whitelist which GHC options get passed along to LiquidHaskell.
 -- (see issue #2)
 sanitizeGhcOptions :: GhcOptions -> GhcOptions
-sanitizeGhcOptions opts = GhcOptions
+sanitizeGhcOptions opts = opts
   { ghcOptNoLink             = NoFlag -- LH uses LinkInMemory
   , ghcOptOptimisation       = NoFlag -- conflicts with interactive mode GHC
   , ghcOptProfilingMode      = NoFlag -- LH sets its own profiling mode
