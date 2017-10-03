@@ -22,6 +22,7 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.ParseUtils
 import Distribution.Simple
+import Distribution.Simple.Compiler
 import Distribution.Simple.GHC
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
@@ -29,6 +30,7 @@ import Distribution.Simple.Program.Db
 import Distribution.Simple.Program.GHC
 import Distribution.Simple.Setup
 import Distribution.Simple.Utils
+import Distribution.Version
 import Distribution.Verbosity
 
 import System.FilePath
@@ -123,60 +125,30 @@ getUserArgs desc bi =
 -- Construct GHC Options -------------------------------------------------------
 --------------------------------------------------------------------------------
 
-makeGhcFlags :: Verbosity -> LocalBuildInfo -> ComponentLocalBuildInfo
-             -> BuildInfo -> [String]
-makeGhcFlags verbosity lbi clbi bi =
-  renderGhcOptions (compiler lbi) $
-  sanitizeGhcOptions $
-  componentGhcOptions verbosity lbi bi clbi $ buildDir lbi
-
+makeGhcFlags
+  :: Verbosity
+  -> LocalBuildInfo
+  -> ComponentLocalBuildInfo
+  -> BuildInfo
+  -> [String]
+#if MIN_VERSION_Cabal(1,24,0)
+makeGhcFlags verbosity lbi clbi bi
+  = renderGhcOptions (compilerVersion (compiler lbi))
+  $ sanitizeGhcOptions
+  $ componentGhcOptions verbosity lbi bi clbi (buildDir lbi)
+#else
+makeGhcFlags verbosity lbi clbi bi
+  = renderGhcOptions (compiler lbi)
+  $ sanitizeGhcOptions
+  $ componentGhcOptions verbosity lbi bi clbi (buildDir lbi)
+#endif
 -- Whitelist which GHC options get passed along to LiquidHaskell.
 -- (see issue #2)
 sanitizeGhcOptions :: GhcOptions -> GhcOptions
 sanitizeGhcOptions opts = GhcOptions
-  { ghcOptMode               = ghcOptMode               opts
-  , ghcOptExtra              = ghcOptExtra              opts
-  , ghcOptExtraDefault       = ghcOptExtraDefault       opts
-  , ghcOptInputFiles         = ghcOptInputFiles         opts
-  , ghcOptInputModules       = ghcOptInputModules       opts
-  , ghcOptOutputFile         = ghcOptOutputFile         opts
-  , ghcOptOutputDynFile      = ghcOptOutputDynFile      opts
-  , ghcOptSourcePathClear    = ghcOptSourcePathClear    opts
-  , ghcOptSourcePath         = ghcOptSourcePath         opts
-#if MIN_VERSION_Cabal(1,24,0)
-  , ghcOptThisUnitId         = ghcOptThisUnitId         opts
-#elif MIN_VERSION_Cabal(1,22,0)
-  , ghcOptPackageKey         = ghcOptPackageKey         opts
-#else
-  , ghcOptPackageName        = ghcOptPackageName        opts
-#endif
-  , ghcOptPackageDBs         = ghcOptPackageDBs         opts
-  , ghcOptPackages           = ghcOptPackages           opts
-  , ghcOptHideAllPackages    = ghcOptHideAllPackages    opts
-  , ghcOptNoAutoLinkPackages = ghcOptNoAutoLinkPackages opts
-#if MIN_VERSION_Cabal(1,22,0) && !MIN_VERSION_Cabal(1,24,0)
-  , ghcOptSigOf              = ghcOptSigOf              opts
-#endif
-  , ghcOptLinkLibs           = ghcOptLinkLibs           opts
-  , ghcOptLinkLibPath        = ghcOptLinkLibPath        opts
-  , ghcOptLinkOptions        = ghcOptLinkOptions        opts
-  , ghcOptLinkFrameworks     = ghcOptLinkFrameworks     opts
-  , ghcOptNoLink             = NoFlag -- LH uses LinkInMemory
-  , ghcOptLinkNoHsMain       = ghcOptLinkNoHsMain       opts
-  , ghcOptCcOptions          = ghcOptCcOptions          opts
-  , ghcOptCppOptions         = ghcOptCppOptions         opts
-  , ghcOptCppIncludePath     = ghcOptCppIncludePath     opts
-  , ghcOptCppIncludes        = ghcOptCppIncludes        opts
-  , ghcOptFfiIncludes        = ghcOptFfiIncludes        opts
-  , ghcOptLanguage           = ghcOptLanguage           opts
-  , ghcOptExtensions         = ghcOptExtensions         opts
-  , ghcOptExtensionMap       = ghcOptExtensionMap       opts
+  { ghcOptNoLink             = NoFlag -- LH uses LinkInMemory
   , ghcOptOptimisation       = NoFlag -- conflicts with interactive mode GHC
-#if MIN_VERSION_Cabal(1,22,0)
-  , ghcOptDebugInfo          = ghcOptDebugInfo          opts
-#endif
   , ghcOptProfilingMode      = NoFlag -- LH sets its own profiling mode
-  , ghcOptSplitObjs          = ghcOptSplitObjs          opts
 #if MIN_VERSION_Cabal(1,20,0)
   , ghcOptNumJobs            = NoFlag -- not relevant for LH
 #endif
@@ -184,23 +156,6 @@ sanitizeGhcOptions opts = GhcOptions
   , ghcOptHPCDir             = NoFlag -- not relevant for LH
 #endif
   , ghcOptGHCiScripts        = mempty -- may interfere with interactive mode?
-  , ghcOptHiSuffix           = ghcOptHiSuffix           opts
-  , ghcOptObjSuffix          = ghcOptObjSuffix          opts
-  , ghcOptDynHiSuffix        = ghcOptDynHiSuffix        opts
-  , ghcOptDynObjSuffix       = ghcOptDynObjSuffix       opts
-  , ghcOptHiDir              = ghcOptHiDir              opts
-  , ghcOptObjDir             = ghcOptObjDir             opts
-  , ghcOptOutputDir          = ghcOptOutputDir          opts
-  , ghcOptStubDir            = ghcOptStubDir            opts
-  , ghcOptDynLinkMode        = ghcOptDynLinkMode        opts
-  , ghcOptShared             = ghcOptShared             opts
-  , ghcOptFPic               = ghcOptFPic               opts
-  , ghcOptDylibName          = ghcOptDylibName          opts
-#if MIN_VERSION_Cabal(1,22,0)
-  , ghcOptRPaths             = ghcOptRPaths             opts
-#endif
-  , ghcOptVerbosity          = ghcOptVerbosity          opts
-  , ghcOptCabal              = ghcOptCabal              opts
   }
 
 --------------------------------------------------------------------------------
