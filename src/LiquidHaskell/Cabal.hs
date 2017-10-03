@@ -131,17 +131,14 @@ makeGhcFlags
   -> ComponentLocalBuildInfo
   -> BuildInfo
   -> [String]
+makeGhcFlags verbosity lbi clbi bi =
 #if MIN_VERSION_Cabal(1,24,0)
-makeGhcFlags verbosity lbi clbi bi
-  = renderGhcOptions (compiler lbi) (hostPlatform lbi)
-  $ sanitizeGhcOptions
-  $ componentGhcOptions verbosity lbi bi clbi (buildDir lbi)
+  renderGhcOptions (compiler lbi) (hostPlatform lbi)
 #else
-makeGhcFlags verbosity lbi clbi bi
-  = renderGhcOptions (compiler lbi)
+  renderGhcOptions (compiler lbi)
+#endif
   $ sanitizeGhcOptions
   $ componentGhcOptions verbosity lbi bi clbi (buildDir lbi)
-#endif
 
 -- Mute options that interfere with Liquid Haskell
 sanitizeGhcOptions :: GhcOptions -> GhcOptions
