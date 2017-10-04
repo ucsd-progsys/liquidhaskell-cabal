@@ -111,8 +111,8 @@ liquidHaskellPostBuildHook args flags pkg lbi = do
 type CabalBuildHook = PackageDescription -> LocalBuildInfo -> UserHooks -> BuildFlags -> IO ()
 
 quietWhenNoCode :: CabalBuildHook -> CabalBuildHook
-quietWhenNoCode pd lbi uh bf = do
-    buildHook simpleUserHooks pd lbi uh bf `catch` continueWhenNoCode
+quietWhenNoCode hook pd lbi uh bf = do
+    hook pd lbi uh bf `catch` continueWhenNoCode
   where
     noCode = any (== "-fno-code") (concatMap snd (buildProgramArgs bf))
     continueWhenNoCode
