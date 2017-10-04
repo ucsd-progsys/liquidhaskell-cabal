@@ -3,6 +3,7 @@
 -- for setup and usage instructions.
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module LiquidHaskell.Cabal (
     -- * Setup.hs Hooks Kit
@@ -11,6 +12,7 @@ module LiquidHaskell.Cabal (
   , liquidHaskellPostBuildHook
   ) where
 
+import Control.Exception
 import Control.Monad
 
 import Data.List
@@ -32,6 +34,8 @@ import Distribution.Verbosity
 import Distribution.Utils.NubList
 
 import System.FilePath
+
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- Setup.hs Hooks Kit ----------------------------------------------------------
@@ -64,7 +68,11 @@ liquidHaskellMain = defaultMainWithHooks liquidHaskellHooks
 -- > main = defaultMainWithHooks $
 -- >   simpleUserHooks { postBuild = liquidHaskellPostBuildHook }
 liquidHaskellHooks :: UserHooks
-liquidHaskellHooks = simpleUserHooks { postBuild = liquidHaskellPostBuildHook }
+liquidHaskellHooks = simpleUserHooks
+  { postBuild = liquidHaskellPostBuildHook
+  , buildHook = quietWhenNoCode (buildHook simpleUserHooks)
+  , hookedPrograms = [liquidProgram]
+  }
 
 -- | The raw build hook, checking the @liquidhaskell@ flag and executing the
 -- LiquidHaskell binary with appropriate arguments when enabled. Can be hooked
@@ -95,6 +103,23 @@ liquidHaskellPostBuildHook args flags pkg lbi = do
 
         _ -> return ()
 
+
+--------------------------------------------------------------------------------
+-- Build process tweaks --------------------------------------------------------
+--------------------------------------------------------------------------------
+
+type CabalBuildHook = PackageDescription -> LocalBuildInfo -> UserHooks -> BuildFlags -> IO ()
+
+quietWhenNoCode :: CabalBuildHook -> CabalBuildHook
+quietWhenNoCode pd lbi uh bf = do
+    buildHook simpleUserHooks pd lbi uh bf `catch` continueWhenNoCode
+  where
+    noCode = any (== "-fno-code") (concatMap snd (buildProgramArgs bf))
+    continueWhenNoCode
+      | noCode    = const (return ())  -- (\(e :: SomeException) -> putStrLn (displayException e))
+      | otherwise = throw
+
+
 --------------------------------------------------------------------------------
 -- Verify a Library or Executable Component ------------------------------------
 --------------------------------------------------------------------------------
@@ -104,6 +129,7 @@ verifyComponent :: Verbosity -> LocalBuildInfo -> ComponentLocalBuildInfo
 verifyComponent verbosity lbi clbi bi desc sources = do
   userArgs <- getUserArgs desc bi
   let ghcFlags = makeGhcFlags verbosity lbi clbi bi
+--  traceM (unwords ghcFlags)
   let args = concat
         [ ("--ghc-option=" ++) <$> ghcFlags
         , ("--c-files="    ++) <$> cSources bi
