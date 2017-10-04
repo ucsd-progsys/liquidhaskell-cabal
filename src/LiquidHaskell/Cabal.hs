@@ -116,7 +116,7 @@ quietWhenNoCode pd lbi uh bf = do
   where
     noCode = any (== "-fno-code") (concatMap snd (buildProgramArgs bf))
     continueWhenNoCode
-      | noCode    = const (return ())  -- (\(e :: SomeException) -> putStrLn (displayException e))
+      | noCode    = const (return ())
       | otherwise = throw
 
 
@@ -129,7 +129,6 @@ verifyComponent :: Verbosity -> LocalBuildInfo -> ComponentLocalBuildInfo
 verifyComponent verbosity lbi clbi bi desc sources = do
   userArgs <- getUserArgs desc bi
   let ghcFlags = makeGhcFlags verbosity lbi clbi bi
---  traceM (unwords ghcFlags)
   let args = concat
         [ ("--ghc-option=" ++) <$> ghcFlags
         , ("--c-files="    ++) <$> cSources bi
