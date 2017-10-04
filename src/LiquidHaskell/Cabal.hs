@@ -33,7 +33,6 @@ import Distribution.Utils.NubList
 
 import System.FilePath
 
-import Debug.Trace
 --------------------------------------------------------------------------------
 -- Setup.hs Hooks Kit ----------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -105,15 +104,12 @@ verifyComponent :: Verbosity -> LocalBuildInfo -> ComponentLocalBuildInfo
 verifyComponent verbosity lbi clbi bi desc sources = do
   userArgs <- getUserArgs desc bi
   let ghcFlags = makeGhcFlags verbosity lbi clbi bi
-  traceIO (show bi)
---  traceIO (unwords ghcFlags)
   let args = concat
         [ ("--ghc-option=" ++) <$> ghcFlags
         , ("--c-files="    ++) <$> cSources bi
         , userArgs
         , sources
         ]
-
   liquid <- requireLiquidProgram verbosity $ withPrograms lbi
   runProgram verbosity liquid args
 
