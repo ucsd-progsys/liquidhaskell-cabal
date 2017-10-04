@@ -15,14 +15,12 @@ import Control.Monad
 
 import Data.List
 import Data.Maybe
-import Data.Monoid
 
 import Distribution.ModuleName hiding (main)
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.ParseUtils
 import Distribution.Simple
-import Distribution.Simple.Compiler
 import Distribution.Simple.GHC
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
@@ -30,11 +28,12 @@ import Distribution.Simple.Program.Db
 import Distribution.Simple.Program.GHC
 import Distribution.Simple.Setup
 import Distribution.Simple.Utils
-import Distribution.Version
 import Distribution.Verbosity
+import Distribution.Utils.NubList
 
 import System.FilePath
 
+import Debug.Trace
 --------------------------------------------------------------------------------
 -- Setup.hs Hooks Kit ----------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -85,12 +84,16 @@ liquidHaskellPostBuildHook args flags pkg lbi = do
     let verbosity = fromFlag $ buildVerbosity flags
     withAllComponentsInBuildOrder pkg lbi $ \component clbi ->
       case component of
-        CLib lib -> verifyComponent verbosity lbi clbi (libBuildInfo lib)
-                    "library"
-                      =<< findLibSources lib
-        CExe exe -> verifyComponent verbosity lbi clbi (buildInfo exe)
-                    ("executable " ++ exeName exe)
-                      =<< findExeSources exe
+        CLib lib -> do
+          srcs <- findLibSources lib
+          verifyComponent verbosity lbi clbi (libBuildInfo lib)
+            "library" srcs
+
+        CExe exe -> do
+          srcs <- findExeSources exe
+          verifyComponent verbosity lbi clbi (buildInfo exe)
+            ("executable " ++ exeName exe) srcs
+
         _ -> return ()
 
 --------------------------------------------------------------------------------
@@ -102,12 +105,15 @@ verifyComponent :: Verbosity -> LocalBuildInfo -> ComponentLocalBuildInfo
 verifyComponent verbosity lbi clbi bi desc sources = do
   userArgs <- getUserArgs desc bi
   let ghcFlags = makeGhcFlags verbosity lbi clbi bi
+  traceIO (show bi)
+--  traceIO (unwords ghcFlags)
   let args = concat
         [ ("--ghc-option=" ++) <$> ghcFlags
-        , ("--c-files="    ++) <$> (cSources bi)
+        , ("--c-files="    ++) <$> cSources bi
         , userArgs
         , sources
         ]
+
   liquid <- requireLiquidProgram verbosity $ withPrograms lbi
   runProgram verbosity liquid args
 
@@ -153,7 +159,10 @@ sanitizeGhcOptions opts =
        , ghcOptHPCDir             = NoFlag -- not relevant for LH
 #endif
        , ghcOptGHCiScripts        = mempty -- may interfere with interactive mode?
+       , ghcOptExtra              = noOptimisation $ ghcOptExtra opts
        }
+  where
+    noOptimisation = toNubListR . filter (not . isPrefixOf "-O") . fromNubListR
 
 --------------------------------------------------------------------------------
 -- Find Component Haskell Sources ----------------------------------------------
