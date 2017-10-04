@@ -116,7 +116,7 @@ quietWhenNoCode hook pd lbi uh bf = do
   where
     noCode = any (== "-fno-code") (concatMap snd (buildProgramArgs bf))
     continueWhenNoCode
-      | noCode    = const (return ())
+      | noCode    = \(e :: SomeException) -> return ()
       | otherwise = throw
 
 
