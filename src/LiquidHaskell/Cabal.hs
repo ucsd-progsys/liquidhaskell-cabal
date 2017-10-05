@@ -5,11 +5,20 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module LiquidHaskell.Cabal (
-    -- * Setup.hs Hooks Kit
+module LiquidHaskell.Cabal
+  ( -- defaults
     liquidHaskellMain
   , liquidHaskellHooks
+
+    -- transformers
+  , simpleUserHooksLH
+  , enableLiquid
+  , runLiquidPostBuild
+  , runLiquidPostTest
+
+    -- raw hooks
   , liquidHaskellPostBuildHook
+  , liquidHaskellPostTestHook
   ) where
 
 import Control.Exception
@@ -68,11 +77,28 @@ liquidHaskellMain = defaultMainWithHooks liquidHaskellHooks
 -- > main = defaultMainWithHooks $
 -- >   simpleUserHooks { postBuild = liquidHaskellPostBuildHook }
 liquidHaskellHooks :: UserHooks
-liquidHaskellHooks = simpleUserHooks
-  { postBuild = liquidHaskellPostBuildHook
-  , buildHook = quietWhenNoCode (buildHook simpleUserHooks)
-  , hookedPrograms = [liquidProgram]
-  }
+liquidHaskellHooks = runLiquidPostBuild simpleUserHooksLH
+
+simpleUserHooksLH :: UserHooks
+simpleUserHooksLH = enableLiquid simpleUserHooks
+
+enableLiquid :: UserHooks -> UserHooks
+enableLiquid hooks = hooks { hookedPrograms = liquidProgram : hookedPrograms hooks }
+
+runLiquidPostBuild :: UserHooks -> UserHooks
+runLiquidPostBuild hooks = hooks { postBuild = liquidHaskellPostBuildHook
+                                 , buildHook = quietWhenNoCode (buildHook hooks)
+                                 }
+
+runLiquidPostTest  :: UserHooks -> UserHooks
+runLiquidPostTest  hooks = hooks { postTest = liquidHaskellPostTestHook
+                                 }
+
+liquidHaskellPostBuildHook :: Args -> BuildFlags-> PackageDescription -> LocalBuildInfo -> IO ()
+liquidHaskellPostBuildHook args flags pd lbi = liquidHaskellHook args (buildVerbosity flags) pd lbi
+
+liquidHaskellPostTestHook :: Args -> TestFlags-> PackageDescription -> LocalBuildInfo -> IO ()
+liquidHaskellPostTestHook args flags pd lbi = liquidHaskellHook args (testVerbosity flags) pd lbi
 
 -- | The raw build hook, checking the @liquidhaskell@ flag and executing the
 -- LiquidHaskell binary with appropriate arguments when enabled. Can be hooked
@@ -83,12 +109,11 @@ liquidHaskellHooks = simpleUserHooks
 -- > import LiquidHaskell.Cabal
 -- > main = defaultMainWithHooks $
 -- >   simpleUserHooks { postBuild = liquidHaskellPostBuildHook }
-liquidHaskellPostBuildHook :: Args -> BuildFlags -> PackageDescription
-                           -> LocalBuildInfo -> IO ()
-liquidHaskellPostBuildHook args flags pkg lbi = do
+liquidHaskellHook :: Args -> Distribution.Simple.Setup.Flag Verbosity-> PackageDescription -> LocalBuildInfo -> IO ()
+liquidHaskellHook args verbosityFlag pkg lbi = do
   enabled <- isFlagEnabled "liquidhaskell" lbi
   when enabled $ do
-    let verbosity = fromFlag $ buildVerbosity flags
+    let verbosity = fromFlag verbosityFlag
     withAllComponentsInBuildOrder pkg lbi $ \component clbi ->
       case component of
         CLib lib -> do
@@ -103,6 +128,9 @@ liquidHaskellPostBuildHook args flags pkg lbi = do
 
         _ -> return ()
 
+
+liquidHaskellOptions :: String
+liquidHaskellOptions = "x-liquidhaskell-options"
 
 --------------------------------------------------------------------------------
 -- Build process tweaks --------------------------------------------------------
@@ -140,7 +168,7 @@ verifyComponent verbosity lbi clbi bi desc sources = do
 
 getUserArgs :: String -> BuildInfo -> IO [ProgArg]
 getUserArgs desc bi =
-  case lookup "x-liquidhaskell-options" (customFieldsBI bi) of
+  case lookup liquidHaskellOptions (customFieldsBI bi) of
     Nothing  -> return []
     Just cmd ->
       case parseCommandArgs cmd of
@@ -210,7 +238,7 @@ findModuleSource suffixes bi mod =
   findFileWithExtension suffixes (hsSourceDirs bi) (toFilePath mod)
 
 --------------------------------------------------------------------------------
--- Located the LiquidHaskell Binary --------------------------------------------
+-- Locating the LiquidHaskell Binary -------------------------------------------
 --------------------------------------------------------------------------------
 
 requireLiquidProgram :: Verbosity -> ProgramDb -> IO ConfiguredProgram
@@ -247,11 +275,12 @@ getDefaultFlagValue name lbi def = case pkgDescrFile lbi of
 --------------------------------------------------------------------------------
 
 parseCommandArgs :: String -> Either String [ProgArg]
-parseCommandArgs cmd =
-  case fieldSet field 0 cmd [] of
-    ParseOk _ out -> Right $ concat $ map snd out
+parseCommandArgs cmd = case fieldSet field 0 cmd [] of
+    ParseOk _   out -> Right $ foldMap snd out
     ParseFailed err -> Left $ snd $ locatedErrorMsg err
   where
-    field = optsField "x-liquidhaskell-options"
+    field = optsField liquidHaskellOptions
                       (OtherCompiler "LiquidHaskell")
-                      id (++)
+                      id        -- get :: opts -> opts
+                      (++)      -- set :: opts -> opts -> opts
+                                -- where opts=[(CompilerFlavor,[String])]
