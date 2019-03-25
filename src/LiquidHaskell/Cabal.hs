@@ -8,6 +8,7 @@
 module LiquidHaskell.Cabal
   ( -- defaults
     liquidHaskellMain
+  , liquidHaskellMainHooks
   , liquidHaskellHooks
 
     -- transformers
@@ -61,6 +62,7 @@ import Debug.Trace
 -- > import Distribution.Simple
 -- > import LiquidHaskell.Cabal
 -- > main = defaultMainWithHooks liquidHaskellHooks
+
 liquidHaskellMain :: IO ()
 liquidHaskellMain = defaultMainWithHooks liquidHaskellHooks
 
@@ -69,7 +71,7 @@ liquidHaskellMain = defaultMainWithHooks liquidHaskellHooks
 --
 -- > import Distribution.Simple
 -- > import LiquidHaskell.Cabal
--- > main = defaultMainWithHooks liquidHaskellHooks
+-- > main = liquidHaskellMainHooks 
 --
 -- This is equivalent to:
 --
@@ -77,6 +79,13 @@ liquidHaskellMain = defaultMainWithHooks liquidHaskellHooks
 -- > import LiquidHaskell.Cabal
 -- > main = defaultMainWithHooks $
 -- >   simpleUserHooks { postBuild = liquidHaskellPostBuildHook }
+
+liquidHaskellMainHooks :: IO ()
+liquidHaskellMainHooks = defaultMainWithHooks $
+  simpleUserHooks { postBuild = liquidHaskellPostBuildHook }
+
+
+
 liquidHaskellHooks :: UserHooks
 liquidHaskellHooks = runLiquidPostBuild simpleUserHooksLH
 
